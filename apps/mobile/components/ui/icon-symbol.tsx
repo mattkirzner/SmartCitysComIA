@@ -21,6 +21,7 @@ const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'briefcase.fill': 'work',
+  'bubble.left.fill': 'chat',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
 } as const satisfies Record<

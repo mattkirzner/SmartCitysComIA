@@ -28,9 +28,9 @@ Não crie, edite ou exclua arquivos nem implemente funcionalidades completas sem
 Execute na raiz:
 
 - `npm.cmd ci`: dependências do monorepo.
-- `npm.cmd run team:android`: development client + API compartilhada.
+- `npm.cmd run team:android`: development client + API local em `http://127.0.0.1:8080`. Este fork é uma versão de testes.
 - `npm.cmd run team:backend -- up`: stack local com PostgreSQL e Redis próprios.
-- `npm.cmd run team:android:local`: development client + API local por ADB.
+- `npm.cmd run team:android:shared`: development client + API compartilhada da equipe. Não é o caminho deste fork.
 - `npm.cmd run team:backend -- test`: API em banco/cache exclusivos de testes.
 - `npm.cmd run mobile:test`: testes mobile.
 - `npm.cmd run mobile:lint`: análise estática mobile.

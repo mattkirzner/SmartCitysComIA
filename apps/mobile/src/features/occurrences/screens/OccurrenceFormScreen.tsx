@@ -22,11 +22,13 @@ import {
 } from '@/src/features/occurrences/models/occurrenceOptions';
 import { useOccurrenceFormViewModel } from
     '@/src/features/occurrences/viewmodels/useOccurrenceFormViewModel';
+import type { OccurrenceFormDraft } from
+    '@/src/features/occurrences/models/OccurrenceFormDraft';
 
-type Props = { id?: number };
+type Props = { id?: number; draft?: OccurrenceFormDraft };
 
-export function OccurrenceFormScreen({ id }: Props) {
-    const vm = useOccurrenceFormViewModel(id);
+export function OccurrenceFormScreen({ id, draft }: Props) {
+    const vm = useOccurrenceFormViewModel(id, undefined, draft);
     const scheme = useColorScheme() ?? 'light';
     const colors = Colors[scheme];
     const cameraRef = useRef<CameraView>(null);

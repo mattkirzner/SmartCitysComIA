@@ -9,9 +9,14 @@ import { parseEnv } from 'node:util';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mobile = path.join(root, 'apps/mobile');
 const args = process.argv.slice(2);
-if (args.some(arg => !['--local-api', '--check'].includes(arg))) {
-  throw new Error('Opções aceitas: --local-api e --check.');
+if (args.some(arg => !['--local-api', '--shared-api', '--check'].includes(arg))) {
+  throw new Error('Opções aceitas: --local-api, --shared-api e --check.');
 }
+if (args.includes('--local-api') && args.includes('--shared-api')) {
+  throw new Error('Use apenas um destino: --local-api ou --shared-api.');
+}
+// Fork de testes: o app fala com o gateway local, salvo --shared-api.
+const useLocalApi = !args.includes('--shared-api');
 const envPath = path.join(mobile, '.env.team.local');
 if (!existsSync(envPath)) copyFileSync(path.join(mobile, '.env.team.example'), envPath);
 const config = parseEnv(readFileSync(envPath, 'utf8'));
@@ -24,10 +29,13 @@ delete env.GOOGLE_MAPS_ANDROID_API_KEY;
 delete env.GOOGLE_SERVICES_JSON;
 delete env.EAS_BUILD_PROFILE;
 delete env.EAS_BUILD;
-if (args.includes('--local-api')) env.EXPO_PUBLIC_API_URL = 'http://127.0.0.1:8080';
+if (useLocalApi) {
+  env.EXPO_PUBLIC_API_URL = 'http://127.0.0.1:8080';
+  env.EXPO_PUBLIC_CHAT_URL = 'http://127.0.0.1:8000';
+}
 if (args.includes('--check')) {
   console.log('Configuração pública da equipe carregada; nenhum segredo é necessário para iniciar o Metro.');
-  console.log(args.includes('--local-api') ? 'Destino: API local via USB/emulador.' : 'Destino: API compartilhada.');
+  console.log(useLocalApi ? 'Destino: API local via USB/emulador.' : 'Destino: API compartilhada.');
   process.exit(0);
 }
 
@@ -43,7 +51,7 @@ const devices = probe.stdout.split(/\r?\n/).map(line => line.match(/^(\S+)\s+dev
 const serial = devices.length === 1 ? devices[0] : undefined;
 if (!serial) throw new Error('Mantenha apenas um Android conectado: feche outros emuladores ou desconecte os outros celulares.');
 env.ANDROID_SERIAL = serial;
-for (const port of args.includes('--local-api') ? [8080, 8081] : [8081]) {
+for (const port of useLocalApi ? [8080, 8000, 8081] : [8081]) {
   const reverse = spawnSync(adb, ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`], { stdio: 'inherit', env });
   if (reverse.status !== 0) throw new Error(`Não foi possível encaminhar a porta ${port}.`);
 }

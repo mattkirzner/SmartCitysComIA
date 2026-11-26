@@ -10,7 +10,120 @@ Preparação, cuidados com dados e relatórios: [guia da jornada completa](.maes
 Execução aprovada em 22/11/2026: [evidências e limites](docs/tas-evidence/final-2026-11-22/README.md).
 Evidências refeitas em 23/11/2026, aguardando o mapa carregado: [novo relatório aprovado](docs/tas-evidence/final-map-2026-11-23/README.md).
 
-Aplicativo mobile para registro e acompanhamento de ocorrências urbanas, com mapa, autenticação Keycloak e acesso para cidadãos e gestores. O monorepo reúne o aplicativo React Native/Expo e os serviços Express da API.
+Aplicativo mobile para registro e acompanhamento de ocorrências urbanas, com mapa, autenticação Keycloak e acesso para cidadãos e gestores. Este repositório é o fork de testes **SmartCitysComIA**: o monorepo reúne o app React Native/Expo, a API Express e a aba **Assistente**, que fala com o chatbot em um Git separado.
+
+O módulo de IA (AV2, Docker, dados mockados) está em [mattkirzner/chatbot-ia-cidade-conectada](https://github.com/mattkirzner/chatbot-ia-cidade-conectada). Clone os dois lado a lado. Quem só vai avaliar o chatbot não precisa deste repositório.
+
+## Setup local com o assistente
+
+O Expo Go **não abre** este app. Use o APK **development**, um emulador com Google Play (ou um Android USB) e o Metro via `npm.cmd run team:android`. Esse script define `SMARTCITYS_PREBUILT_CLIENT=1` e **não pede** chave do Google Maps. Ele aponta o app para a API local (`http://127.0.0.1:8080`) e o chatbot (`http://127.0.0.1:8000`), e encaminha as portas 8080, 8000 e 8081.
+
+### O que instalar
+
+- Git, **Node.js 22 LTS**, Docker Desktop (containers Linux)
+- Android Studio: SDK Platform-Tools (`adb`) e um AVD com imagem **Google Play**
+- APK **development 1.0.1** (não o preview): [build](https://expo.dev/accounts/dkartss-team/projects/wb/builds/103030d5-f0d1-4134-a6c2-5f0458cc7931) · [APK direto](https://expo.dev/artifacts/eas/X8BhvkN_iwkHaEMfyyRaXxkLemRMIEputo8E9gJHU_c.apk)
+
+Arraste o APK para o emulador. Os pacotes preview e development são o mesmo (`com.darkartsbm.smartcitys`): um substitui o outro. Deixe **um** Android autorizado em `adb devices`.
+
+### Subir na primeira vez
+
+Pastas irmãs, por exemplo `SmartCitysComIA` e `chatbot-ia-cidade-conectada`.
+
+```powershell
+git clone https://github.com/mattkirzner/SmartCitysComIA.git
+cd SmartCitysComIA
+npm.cmd ci
+```
+
+Terminal 1 — API:
+
+```powershell
+npm.cmd run team:backend -- up
+curl.exe http://127.0.0.1:8080/health
+```
+
+Terminal 2 — chatbot (no outro clone), para o app ler ocorrências reais:
+
+```powershell
+copy .env.example .env
+```
+
+No `.env`, `DATA_SOURCE=http` e `GROQ_API_KEY` preenchida. Depois:
+
+```powershell
+docker compose up --build
+curl.exe http://localhost:8000/health
+```
+
+Terminal 3 — emulador já aberto, APK development instalado:
+
+```powershell
+$env:NODE_OPTIONS = "--dns-result-order=ipv4first"
+npm.cmd run team:android
+```
+
+`NODE_OPTIONS` faz o Metro escutar em `127.0.0.1` (IPv4). Sem isso, no Windows ele costuma ficar só em `[::1]:8081` e o emulador falha. Confira: `netstat -ano | findstr :8081` deve listar `127.0.0.1:8081`.
+
+Crie a conta no Keycloak pela tela de registro do app (papel `cidadao`). A aba **Assistente** envia o token e o histórico a `POST /chat`. O modelo não grava ocorrência: o rascunho abre **Nova ocorrência** e o envio continua no Salvar.
+
+A API compartilhada da equipe (`https://api.darkartsbm.com`) fica em `npm.cmd run team:android:shared` e **não** encaminha a porta do chatbot.
+
+### Comandos da API local
+
+| Serviço | Endereço |
+|---|---|
+| Gateway | `http://127.0.0.1:8080` |
+| Chatbot | `http://127.0.0.1:8000` |
+| PostgreSQL de desenvolvimento | `127.0.0.1:5433`, banco `smartcitys_dev` |
+| PostgreSQL de testes | `127.0.0.1:5434`, banco `smartcitys_test` |
+
+```powershell
+npm.cmd run team:backend -- logs
+npm.cmd run team:backend -- migrate
+npm.cmd run team:backend -- test
+npm.cmd run team:backend -- down
+```
+
+No backend local o push real fica desativado. Guia completo da equipe: [docs/team-development.md](docs/team-development.md).
+
+## Troubleshooter (Metro e emulador)
+
+Estes casos apareceram ao ligar o fork no Android Studio. Deixe o terminal do Metro aberto enquanto testa.
+
+**Expo Go / tecla `s`.** Este projeto usa `expo-dev-client`, mapa, câmera e notificações. O Expo Go não carrega. Não pressione `s` no Metro.
+
+**`GOOGLE_MAPS_ANDROID_API_KEY` ao subir o Metro.** Você não passou por `team:android`. Esse script define `SMARTCITYS_PREBUILT_CLIENT=1` e remove a chave. Use `npm.cmd run team:android`, não `npx expo start --host lan` solto.
+
+**`unexpected end of stream` em `http://127.0.0.1:8081`.** O app abriu a porta e a resposta veio vazia. Quase sempre o Metro está só em `[::1]:8081`. Rode de novo com `$env:NODE_OPTIONS = "--dns-result-order=ipv4first"`. Enquanto o Metro estiver no ar, uma ponte IPv4 temporária:
+
+```powershell
+node -e "const net=require('net'); const s=net.createServer(c=>{ const u=net.connect({host:'::1',port:8081}); c.pipe(u); u.pipe(c); const x=()=>{c.destroy();u.destroy()}; c.on('error',x); u.on('error',x); }); s.listen(8081,'127.0.0.1',()=>console.log('ponte pronta'));"
+```
+
+No Chrome do computador, `http://127.0.0.1:8081` deve devolver JSON. No cliente de desenvolvimento do emulador, conecte em `http://127.0.0.1:8081`. O terminal do Metro passa a mostrar Bundling.
+
+**`Failed to connect to /10.0.2.2:8081`.** `team:android` usa `--localhost`; o Metro não escuta no adaptador que o `10.0.2.2` alcança. Volte para `127.0.0.1:8081` com o `adb reverse` (o script já faz isso).
+
+**`No apps connected` ao pressionar `r`.** O JavaScript ainda não entrou no emulador. Ignore o reload até o Bundling aparecer. Feche o SmartCitys, abra de novo o ícone development e conecte em `http://127.0.0.1:8081`.
+
+**Abertura automática falha, mas o Metro está em pé.** `team:android` passa `--android` e tenta abrir o deep link na hora. Se o túnel ainda não estiver pronto, ignore o erro Java, deixe o terminal aberto e conecte na tela do cliente de desenvolvimento.
+
+**Mais de um Android.** O script exige um único `device` em `adb devices`. Feche o outro emulador ou desconecte o celular.
+
+**`adb reverse` listado, mas o Chrome no emulador não abre `127.0.0.1:8081`.** Recrie o servidor ADB e o túnel:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" kill-server
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" start-server
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:8081 tcp:8081
+```
+
+**Assistente não responde.** Confira o container do chatbot, `DATA_SOURCE=http`, `GROQ_API_KEY` e `adb reverse --list` com `tcp:8000`. Recarregue o app depois que o chatbot estiver saudável.
+
+## Declaração de uso de IA generativa na versão com chatbot de IA
+
+Este módulo e a adaptação da AV2 foram escritos com apoio de assistente de código (Cursor) usando Grok 4.6 e Grok 4.7. Os dados são fictícios. A classificação em linguagem natural, quando usada, passa pela API do Groq; a demonstração da AV2 usa só regras e o JSON versionado. Não tratei dados pessoais. Revisei o que foi feito e sou completamente responsável pelo resultado.
 
 ## Estado do projeto — 22/11/2026
 
@@ -41,79 +154,7 @@ Os dois perfis usam o pacote `com.darkartsbm.smartcitys`; não ficam instalados 
 
 Android é a plataforma validada para o piloto. A configuração iOS existe, mas assinatura, build, distribuição e aceite no iPhone continuam pendentes. Não há distribuição de produção nas lojas configurada neste fluxo.
 
-## Início rápido para a equipe
-
-Antes da primeira tarefa, leia [como contribuir e orientar seu agente](CONTRIBUTING.md). O [AGENTS.md](AGENTS.md) reúne as instruções comuns para agentes de código; o [guia técnico](docs/team-development.md) detalha instalação e operação.
-
-Instale Git, **Node.js 22 LTS**, Android Studio/SDK e um emulador com Google Play ou celular Android com depuração USB. Para executar a API local, instale e inicie o **Docker Desktop com containers Linux**.
-
-Na primeira vez:
-
-```powershell
-git clone https://github.com/Lobiroka/SmartCitys.git
-cd SmartCitys
-npm.cmd ci
-git switch -c feature/minha-alteracao
-```
-
-Crie sua própria conta no Keycloak pela tela de registro. Novas contas recebem o papel `cidadao`; o responsável atribui `gestor` quando necessário. Não use a conta administrativa nem a conta da automação E2E.
-
-Instale o APK **development**, abra o emulador e mantenha apenas um Android autorizado conectado.
-
-### App com a API compartilhada da AWS
-
-Na raiz do projeto:
-
-```powershell
-npm.cmd run team:android
-```
-
-O script cria `apps/mobile/.env.team.local` a partir do exemplo público, encaminha a porta 8081 por ADB e inicia o Metro. Não precisa receber chave Maps, arquivo Firebase privado ou token Expo. O app usa a API HTTPS compartilhada; utilize apenas dados fictícios identificados pelo integrante.
-
-### App com alterações próprias no backend
-
-Em um terminal na raiz:
-
-```powershell
-npm.cmd run team:backend -- up
-curl.exe http://127.0.0.1:8080/health
-```
-
-Em outro terminal na raiz:
-
-```powershell
-npm.cmd run team:android:local
-```
-
-O backend local inclui Gateway, Demand, Metrics, PostgreSQL e Redis. As senhas locais são geradas automaticamente; não é necessário configurar senha do RDS. O app acessa a API local via ADB, inclusive em celular físico conectado por USB. O login continua usando o Keycloak de testes.
-
-| Serviço local | Endereço |
-|---|---|
-| Gateway | `http://127.0.0.1:8080` |
-| PostgreSQL de desenvolvimento | `127.0.0.1:5433`, banco `smartcitys_dev` |
-| PostgreSQL de testes | `127.0.0.1:5434`, banco `smartcitys_test` |
-| Demand, Metrics e Redis | Rede interna do Compose |
-
-Comandos adicionais:
-
-```powershell
-npm.cmd run team:backend -- logs
-npm.cmd run team:backend -- migrate
-npm.cmd run team:backend -- test
-npm.cmd run team:backend -- down
-```
-
-Os testes usam PostgreSQL e Redis separados dos dados de desenvolvimento. O comando `down` preserva os volumes dos bancos. Depois de trocar de branch ou dependências, execute `up` novamente. Preserve o arquivo local de senhas enquanto preservar os volumes.
-
-No backend local, o envio real de push fica desativado. A lógica pode ser testada com os mocks existentes; a entrega completa de notificações é validada pelo responsável no ambiente de integração.
-
-Para criar uma migration após alterar o schema:
-
-```powershell
-npm.cmd run team:backend -- migration nome_da_mudanca
-```
-
-Revise o SQL e versione schema e migration juntos. Não edite migrations já aplicadas. Consulte o [guia completo da equipe](docs/team-development.md) para operação, credenciais, migrations e limites do ambiente.
+Como contribuir: [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md) e [docs/team-development.md](docs/team-development.md). Para migration: `npm.cmd run team:backend -- migration nome_da_mudanca`.
 
 ## Funcionalidades implementadas
 
@@ -125,6 +166,7 @@ Revise o SQL e versione schema e migration juntos. Não edite migrations já apl
 - Painel do gestor na navegação inferior, mantendo também as funções de cidadão.
 - Listagem e detalhes para gestão, com alteração de status e prioridade autorizada pela API.
 - Notificações de mudança de status via Expo/FCM, com controle de permissão nas configurações do Android.
+- Aba Assistente: conversa com o chatbot, consulta de ocorrências e rascunho no formulário (serviço em repositório separado).
 - Tema claro/escuro e componentes com GlueStack/NativeWind.
 - Perfis EAS development/preview e atualização OTA Android compatível com o runtime instalado.
 
@@ -168,6 +210,7 @@ apps/
       map/                    Mapa e localização
       occurrences/            CRUD, listagem e feed
       manager/                Painel do gestor
+      chat/                   Assistente (POST /chat)
       notifications/          Registro e entrega de push
     src/composition/          Montagem das dependências
     src/shared/               HTTP e utilitários

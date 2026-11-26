@@ -10,6 +10,8 @@ import type {
 } from '@/src/features/occurrences/models/Occurrence';
 import type { OccurrenceService } from
     '@/src/features/occurrences/services/OccurrenceService';
+import type { OccurrenceFormDraft } from
+    '@/src/features/occurrences/models/OccurrenceFormDraft';
 
 type Coordinates = { latitude: number; longitude: number };
 
@@ -25,17 +27,19 @@ const defaultDependencies: OccurrenceFormDependencies = {
 
 export function useOccurrenceFormViewModel(
     id?: number,
-    dependencies: OccurrenceFormDependencies = defaultDependencies,
+    dependencies?: OccurrenceFormDependencies,
+    draft?: OccurrenceFormDraft,
 ) {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [address, setAddress] = useState('');
+    const resolved = dependencies ?? defaultDependencies;
+    const [title, setTitle] = useState(draft?.title ?? '');
+    const [description, setDescription] = useState(draft?.description ?? '');
+    const [address, setAddress] = useState(draft?.address ?? '');
     const [category, setCategory] =
-        useState<OccurrenceCategory>('ILUMINACAO_PUBLICA');
+        useState<OccurrenceCategory>(draft?.category ?? 'ILUMINACAO_PUBLICA');
     const [region, setRegion] =
-        useState<OccurrenceRegion>('REGIAO_METROPOLITANA_DO_RECIFE');
+        useState<OccurrenceRegion>(draft?.region ?? 'REGIAO_METROPOLITANA_DO_RECIFE');
     const [priority, setPriority] =
-        useState<OccurrencePriority>('MEDIA');
+        useState<OccurrencePriority>(draft?.priority ?? 'MEDIA');
     const [latitude, setLatitude] = useState<number | null>(null);
     const [longitude, setLongitude] = useState<number | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
@@ -47,7 +51,7 @@ export function useOccurrenceFormViewModel(
         if (!id) return;
 
         let active = true;
-        dependencies.service.getById(id)
+        resolved.service.getById(id)
             .then((occurrence) => {
                 if (!active) return;
                 setTitle(occurrence.title);
@@ -72,12 +76,12 @@ export function useOccurrenceFormViewModel(
             });
 
         return () => { active = false; };
-    }, [dependencies.service, id]);
+    }, [resolved.service, id]);
 
     const useCurrentLocation = useCallback(async () => {
         setError(null);
         try {
-            const coordinates = await dependencies.getCoordinates();
+            const coordinates = await resolved.getCoordinates();
             setLatitude(coordinates.latitude);
             setLongitude(coordinates.longitude);
         } catch (caught) {
@@ -85,7 +89,7 @@ export function useOccurrenceFormViewModel(
                 ? caught.message
                 : 'Não foi possível obter sua localização.');
         }
-    }, [dependencies]);
+    }, [resolved]);
 
     const save = useCallback(async () => {
         const trimmedAddress = address.trim();
@@ -117,9 +121,9 @@ export function useOccurrenceFormViewModel(
         setError(null);
         try {
             if (id) {
-                await dependencies.service.update(id, input);
+                await resolved.service.update(id, input);
             } else {
-                await dependencies.service.create(input);
+                await resolved.service.create(input);
             }
             return true;
         } catch (caught) {
@@ -131,7 +135,7 @@ export function useOccurrenceFormViewModel(
             setIsSaving(false);
         }
     }, [
-        address, category, dependencies.service, description, id, latitude, longitude,
+        address, category, resolved.service, description, id, latitude, longitude,
         photo, priority, region, title,
     ]);
 

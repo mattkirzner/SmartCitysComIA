@@ -165,4 +165,29 @@ describe('useOccurrenceFormViewModel', () => {
         );
         expect(service.create).not.toHaveBeenCalled();
     });
+
+    it('hidrata o formulário com o rascunho e só grava no salvar', async () => {
+        const service = createOccurrenceServiceMock();
+        const getCoordinates = jest.fn();
+        const { result } = renderHook(() => useOccurrenceFormViewModel(
+            undefined,
+            { service, getCoordinates },
+            {
+                title: 'Buraco',
+                description: 'Na rua',
+                address: 'Rua das Flores',
+                category: 'MANUTENCAO_DE_VIAS',
+                region: 'AGRESTE',
+                priority: 'ALTA',
+            },
+        ));
+
+        expect(result.current.title).toBe('Buraco');
+        expect(result.current.description).toBe('Na rua');
+        expect(result.current.address).toBe('Rua das Flores');
+        expect(result.current.category).toBe('MANUTENCAO_DE_VIAS');
+        expect(result.current.region).toBe('AGRESTE');
+        expect(result.current.priority).toBe('ALTA');
+        expect(service.create).not.toHaveBeenCalled();
+    });
 });

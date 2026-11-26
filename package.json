@@ -13,6 +13,7 @@
   "scripts": {
     "team:android": "node scripts/team-android.mjs",
     "team:android:local": "node scripts/team-android.mjs --local-api",
+    "team:android:shared": "node scripts/team-android.mjs --shared-api",
     "team:backend": "node scripts/team-backend.mjs",
     "mobile": "npm run start --workspace @smart-city/mobile",
     "mobile:android": "npm run android --workspace @smart-city/mobile",
